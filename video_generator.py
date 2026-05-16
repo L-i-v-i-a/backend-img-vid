@@ -2,7 +2,7 @@ import torch
 import imageio
 from PIL import Image
 
-from model_loader import pipe
+from model_loader import load_pipe
 
 
 def generate_video(
@@ -12,9 +12,16 @@ def generate_video(
     output_path: str = "outputs/generated.mp4"
 ):
 
+    # load image
     image = Image.open(image_path).convert("RGB")
 
-    # Seed for reproducibility
+    # load model ONLY when needed
+    pipe = load_pipe()
+
+    if pipe is None:
+        raise RuntimeError("Model failed to load")
+
+    # seed
     generator = torch.manual_seed(42)
 
     # =========================
@@ -29,10 +36,6 @@ def generate_video(
 
     frames_output = result.frames[0]
 
-    imageio.mimsave(
-        output_path,
-        frames_output,
-        fps=7
-    )
+    imageio.mimsave(output_path, frames_output, fps=7)
 
     return output_path
