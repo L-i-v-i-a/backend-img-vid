@@ -1,8 +1,6 @@
-import torch
-import imageio
+from moviepy.editor import ImageClip
 from PIL import Image
-
-from model_loader import load_pipe
+import os
 
 
 def generate_video(
@@ -12,30 +10,67 @@ def generate_video(
     output_path: str = "outputs/generated.mp4"
 ):
 
-    # load image
+    os.makedirs("outputs", exist_ok=True)
+
+    # =========================
+    # LOAD IMAGE
+    # =========================
     image = Image.open(image_path).convert("RGB")
 
-    # load model ONLY when needed
-    pipe = load_pipe()
+    # Resize for speed
+    image = image.resize((720, 720))
 
-    if pipe is None:
-        raise RuntimeError("Model failed to load")
+    temp_image = "outputs/temp_image.jpg"
+    image.save(temp_image)
 
-    # seed
-    generator = torch.manual_seed(42)
+    duration = 4
 
     # =========================
-    # AI PIPELINE CALL
+    # CREATE CLIP
     # =========================
-    result = pipe(
-        image,
-        decode_chunk_size=1,
-        num_frames=frames,
-        generator=generator
+    clip = ImageClip(temp_image).set_duration(duration)
+
+    # =========================
+    # MOTION EFFECTS
+    # =========================
+    if motion == "zoom":
+
+        clip = clip.resize(
+            lambda t: 1 + (0.08 * t)
+        )
+
+    elif motion == "zoom_out":
+
+        clip = clip.resize(
+            lambda t: 1.2 - (0.05 * t)
+        )
+
+    elif motion == "pan_left":
+
+        clip = clip.set_position(
+            lambda t: (-50 * t, "center")
+        )
+
+    elif motion == "pan_right":
+
+        clip = clip.set_position(
+            lambda t: (50 * t, "center")
+        )
+
+    elif motion == "rotate":
+
+        clip = clip.rotate(
+            lambda t: t * 3
+        )
+
+    # =========================
+    # EXPORT VIDEO
+    # =========================
+    clip.write_videofile(
+        output_path,
+        fps=24,
+        codec="libx264",
+        audio=False
     )
-
-    frames_output = result.frames[0]
-
-    imageio.mimsave(output_path, frames_output, fps=7)
 
     return output_path
