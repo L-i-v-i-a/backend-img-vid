@@ -1,5 +1,10 @@
-from moviepy.editor import ImageClip
+from moviepy.editor import (
+    ImageClip,
+    CompositeVideoClip
+)
+
 from PIL import Image
+
 import os
 import time
 
@@ -13,90 +18,166 @@ def generate_video(
 
     os.makedirs("outputs", exist_ok=True)
 
-    # =========================
-    # SAFE UNIQUE FILE NAMES
-    # =========================
+    # =========================================
+    # UNIQUE FILES
+    # =========================================
+
     timestamp = int(time.time() * 1000)
+
     temp_image = f"outputs/temp_{timestamp}.jpg"
+
     final_output = f"outputs/video_{timestamp}.mp4"
 
-    # =========================
-    # LOAD IMAGE SAFELY
-    # =========================
+    # =========================================
+    # LOAD IMAGE
+    # =========================================
+
     try:
         image = Image.open(image_path).convert("RGB")
+
     except Exception as e:
         raise Exception(f"Failed to load image: {e}")
 
-    # Resize for speed (important for Render stability)
-    image = image.resize((640, 640))
+    # =========================================
+    # RESIZE IMAGE
+    # =========================================
+
+    image = image.resize((900, 900))
+
     image.save(temp_image)
+
+    # =========================================
+    # VIDEO SETTINGS
+    # =========================================
 
     duration = 4
 
-    # =========================
-    # CREATE CLIP
-    # =========================
+    canvas_w = 720
+    canvas_h = 720
+
+    # =========================================
+    # BASE IMAGE CLIP
+    # =========================================
+
     clip = ImageClip(temp_image).set_duration(duration)
 
-    # =========================
-    # MOTION EFFECTS (EXPANDED)
-    # =========================
+    # =========================================
+    # MOTIONS
+    # =========================================
 
-    # 🔵 BASIC ZOOM IN
+    # ZOOM IN
     if motion == "zoom":
-        clip = clip.resize(lambda t: 1 + (0.06 * t))
 
-    # 🔵 ZOOM OUT
+        animated = clip.resize(
+            lambda t: 1 + (0.08 * t)
+        ).set_position("center")
+
+    # ZOOM OUT
     elif motion == "zoom_out":
-        clip = clip.resize(lambda t: 1.2 - (0.05 * t))
 
-    # 🔵 PAN LEFT
+        animated = clip.resize(
+            lambda t: 1.3 - (0.08 * t)
+        ).set_position("center")
+
+    # PAN LEFT
     elif motion == "pan_left":
-        clip = clip.set_position(lambda t: (-60 * t, "center"))
 
-    # 🔵 PAN RIGHT
-    elif motion == "pan_right":
-        clip = clip.set_position(lambda t: (60 * t, "center"))
-
-    # 🔵 PAN UP
-    elif motion == "pan_up":
-        clip = clip.set_position(lambda t: ("center", -60 * t))
-
-    # 🔵 PAN DOWN
-    elif motion == "pan_down":
-        clip = clip.set_position(lambda t: ("center", 60 * t))
-
-    # 🔵 DIAGONAL MOVE
-    elif motion == "pan_diagonal":
-        clip = clip.set_position(lambda t: (40 * t, 40 * t))
-
-    # 🔵 ROTATE
-    elif motion == "rotate":
-        clip = clip.rotate(lambda t: t * 2.5)
-
-    # 🔵 SHAKE EFFECT
-    elif motion == "shake":
-        clip = clip.set_position(
-            lambda t: (5 * (t * 10 % 2 - 1), 5 * (t * 10 % 2 - 1))
+        animated = clip.set_position(
+            lambda t: (-120 * t, "center")
         )
 
-    # 🔵 PULSE ZOOM (nice cinematic effect)
-    elif motion == "pulse":
-        clip = clip.resize(lambda t: 1 + 0.03 * abs(t * 3 % 2 - 1))
+    # PAN RIGHT
+    elif motion == "pan_right":
 
-    # =========================
-    # EXPORT VIDEO (STABLE SETTINGS)
-    # =========================
+        animated = clip.set_position(
+            lambda t: (120 * t, "center")
+        )
+
+    # PAN UP
+    elif motion == "pan_up":
+
+        animated = clip.set_position(
+            lambda t: ("center", -120 * t)
+        )
+
+    # PAN DOWN
+    elif motion == "pan_down":
+
+        animated = clip.set_position(
+            lambda t: ("center", 120 * t)
+        )
+
+    # DIAGONAL
+    elif motion == "pan_diagonal":
+
+        animated = clip.set_position(
+            lambda t: (80 * t, 80 * t)
+        )
+
+    # ROTATE
+    elif motion == "rotate":
+
+        animated = clip.rotate(
+            lambda t: t * 4
+        ).set_position("center")
+
+    # SHAKE
+    elif motion == "shake":
+
+        animated = clip.set_position(
+            lambda t: (
+                10 if int(t * 10) % 2 == 0 else -10,
+                10 if int(t * 10) % 2 == 0 else -10
+            )
+        )
+
+    # PULSE
+    elif motion == "pulse":
+
+        animated = clip.resize(
+            lambda t: 1 + (0.05 * abs((t * 2) % 2 - 1))
+        ).set_position("center")
+
+    # FALLBACK
+    else:
+
+        animated = clip.set_position("center")
+
+    # =========================================
+    # IMPORTANT FIX:
+    # COMPOSITE VIDEO CLIP
+    # =========================================
+
+    final = CompositeVideoClip(
+        [animated],
+        size=(canvas_w, canvas_h)
+    )
+
+    # =========================================
+    # EXPORT
+    # =========================================
+
     try:
-        clip.write_videofile(
+
+        final.write_videofile(
             final_output,
-            fps=12,              # faster + more stable than 24
+            fps=12,
             codec="libx264",
             audio=False,
             logger=None
         )
+
     except Exception as e:
+
         raise Exception(f"Video export failed: {e}")
+
+    # =========================================
+    # CLEAN TEMP IMAGE
+    # =========================================
+
+    try:
+        os.remove(temp_image)
+    except:
+        pass
 
     return final_output
